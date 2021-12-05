@@ -169,6 +169,7 @@ function showPlayed() {
 }
 
 function getGameDetails($gameId) {
+	include("incl/config.php");
 
 	$returnArray = array("gi" => 0
 		, "gt" => "no game found"
@@ -179,8 +180,69 @@ function getGameDetails($gameId) {
 		, "gtl" => 0	// GameTimeMin/Low
 		, "gth" => 0	// GameTimeMax/High
 		, "gef" => 0	// GameEstimatedFrom
+		, "gefi" => 0	// GameEstimatedFromId
 		);
+
+	if ( $gameId <> 0 ) {
+		// create a prepared statement
+		$sqlCheckGame = "select GAME_ID";                    
+		$sqlCheckGame .= ",GAME_TITLE";                    
+		$sqlCheckGame .= ",GAME_PLAYER_MIN";                    
+		$sqlCheckGame .= ",GAME_PLAYER_MAX";                    
+		$sqlCheckGame .= ",GAME_AGE_MIN";                    
+		$sqlCheckGame .= ",GAME_AGE_MAX";                    
+		$sqlCheckGame .= ",GAME_ESTIM_TIME_MIN";                    
+		$sqlCheckGame .= ",GAME_ESTIM_TIME_MAX";                    
+		$sqlCheckGame .= ",GAME_EXTENSION_FROM_GAME";                    
+		$sqlCheckGame .= ",GAME_EXTENSION_FROM_GAME_ID";                    
+		$sqlCheckGame .= " from $TABGAME where GAME_id = ?";
+		debug_log ("search with $sqlCheckGame for ID $gameId");
+		$stmt = $obj_mySqliConn->prepare($sqlCheckGame) or die ("died prepare");
+		debug_log("getGameDetails 2/9");
+
+		// bind
+		$stmt->bind_param("i", $BindParam) or die("died while bind");
+		debug_log("getGameDetails 3/9");
+		$BindParam = $gameId;
+
+		debug_log("getGameDetails 4/9/");
+		/* execute query */
+		$stmt->execute();
+		debug_log("getGameDetails 5/9");
+		
+		/* store the result in an internal buffer */
+		$stmt->store_result();
 	
+		/* Get the number of rows in the result set */
+		$row_cnt = $stmt->num_rows;
+		if ( $row_cnt == 0 ) {
+			debug_log("getGameDetails 5.5/9 (nothing found)");
+			return $returnArray;		
+		};
+
+		/* bind result variables */
+		$stmt->bind_result($rgi, $rgt, $rpl, $rph, $ral, $rah, $rtl, $rth, $reg, $regi) or die("wrong while bind result");
+		debug_log("getGameDetails 6/9");
+
+		/* fetch value */
+		$stmt->fetch() or die ("something went terribly wrong while fetch");
+
+		debug_log($GameNameToCheck . " has the ID " . $res_game_id . "7/9");
+
+		$returnArray = array("gi" => $rgi
+			, "gt" => $rgt
+			, "gpl" => $rpl	// GamePlayerMin/Low
+			, "gph" => $rph	// GamePlayerMax/High
+			, "gal" => $ral	// GameAgeMin/Low
+			, "gah" => $rah	// GameAgeMax/High
+			, "gtl" => $rtl	// GameTimeMin/Low
+			, "gth" => $rth	// GameTimeMax/High
+			, "gef" => $reg	// GameEstimatedFrom
+			, "gefi" => $regi	// GameEstimatedFromId
+			);
+		debug_log("getGameDetails 8/9");
+	}	
+		debug_log("getGameDetails 9/9");
 	return $returnArray;
 /*
 $wochentage = array(
@@ -220,10 +282,10 @@ GAME_EXTENSION_FROM_GAME_ID
 		$gameId = 0;
 	}
 	$gameDetails = getGameDetails($gameId);	
-
+	debug_log("am after getGameDetails having e.g. " . $gameDetails["gt"]);
 	$formPattern = "";
 	$formPattern .= "<form action=\"game.php\" method=\"post\">";
-	$formPattern .= "<input type=\"hidden\" name=\"GameId\" value=\"%s\">"; // 1
+	$formPattern .= "<input type=\"hidden\" name=\"gameId\" value=\"%s\">"; // 1
 	$formPattern .= "<table>";
 
 	printf($formPattern, $gameDetails["gi"]);
@@ -231,34 +293,37 @@ GAME_EXTENSION_FROM_GAME_ID
 	$oneRowPattern = "<tr><th><label for=\"%s\">%s</label></th>		<td><input type=\"%s\"		size=\"%d\"	name=\"%s\"		placeholder=\"%s\"	 value=\"%s\" %s></td></tr>";
 	printf($oneRowPattern, "GameTitle", "Game title", "text", 30, "GameTitle", "Skat", $gameDetails["gt"], "");
 	printf($oneRowPattern, "GamePlayMin", "player min", "number", 3, "GamePlayMin", "2", $gameDetails["gpl"], "min=\"1\"");
-	
+	printf($oneRowPattern, "GamePlayMax", "player max", "number", 3, "GamePlayMax", "2", $gameDetails["gph"], "min=\"1\"");
+	printf($oneRowPattern, "GameAgeMin", "age min", "number", 3, "GameAgeMin", "2", $gameDetails["gal"], "min=\"1\"");
+	printf($oneRowPattern, "GameAgeMax", "age max", "number", 3, "GameAgeMax", "2", $gameDetails["gah"], "min=\"1\"");
+	printf($oneRowPattern, "GameTimeMin", "estim. time min", "number", 3, "GameTimeMin", "2", $gameDetails["gtl"], "min=\"1\"");
+	printf($oneRowPattern, "GameTimeMax", "estim. time max", "number", 3, "GameTimeMax", "2", $gameDetails["gth"], "min=\"1\"");
 
-	$formPattern .= " ";
-	$formPattern .= " ";
-	$formPattern .= " ";
-	$formPattern .= " ";
+	$oneRowPatternSelect = "<tr><th><label for=\"GameExtendFromGameId\"    >extend from game:    </label></th>";
+	$oneRowPatternSelect .= "<td><select name=\"GameExtendFromGameId\">";
+	$oneRowPatternSelectOptionSelect = "<option value=\"%s\" selected>%s</option>";
+	$oneRowPatternSelectOption       = "<option value=\"%s\">%s</option>";
+	$oneRowPatternSelectEnd          = "</select></td></tr>";
 	
+	printf($oneRowPatternSelect);
+	printf($oneRowPatternSelectOptionSelect, "0", "no extend");
+	// loop over games (which have an extension)
+	printf($oneRowPatternSelectOption, "0", " ");
+	// and end of 
+	printf($oneRowPatternSelectEnd);
 	
-	?>
+	$endOfForm  = " ";
+	$endOfForm .= "</table>";
+	$endOfForm .= "<input type=\"hidden\" name=\"action\" value=\"insertUpdateGame\">";
+	$endOfForm .= "<input type=\"submit\" value=\"%s\"> "; // 1
+	$endOfForm .= "</form>\n";
 	
-	
-		<tr><th><label for="GamePlayMax"		>player max:	</label></th>		<td><input type="number"	size= "3"	name="GamePlayMax"	min="1"	placeholder="4"		 value="<?php $gameDetails["gph"] ?>"></td></tr>
-		<tr><th><label for="GameAgeMin"		>age min:		</label></th>		<td><input type="number"	size= "3"	name="GameAgeMin"		min="1"	placeholder="6"		 value="<?php $gameDetails["gal"] ?>"></td></tr>
-		<tr><th><label for="GameAgeMax"		>age max:		</label></th>		<td><input type="number"	size= "3"	name="GameAgeMax"		min="1"	placeholder="99"		 value="<?php $gameDetails["gah"] ?>"></td></tr>
-		<tr><th><label for="GameTimeMin"		>estim. time min:		</label></th>		<td><input type="number"	size= "3"	name="GameTimeMin"		min="1"	placeholder="10"		 value="<?php $gameDetails["gtl"] ?>"></td></tr>
-		<tr><th><label for="GameTimeMax"		>estim. time max:		</label></th>		<td><input type="number"	size= "3"	name="GameTimeMax"		min="1"	placeholder="270"		 value="<?php $gameDetails["gth"] ?>"></td></tr>
-
-		<tr><th><label for="GameExtendFromGameId"    >extend from game:    </label></th>		<td>
-        <select name="GameExtendFromGameId">
-        		<option value="" selected> </option>
-        </select>
-		</td></tr>
-
-		</table>
-		<input type="hidden" name="action" value="insertUpdateGame">
-		<input type="submit" value="create">
-	</form>
-	<?php
+	if ( $gameDetails["gi"] == 0 ) {
+		$whatToDo = "create";
+	} else {
+		$whatToDo = "update";
+	}		
+	printf($endOfForm, $whatToDo);
 }
 
 function showInsertPlayedGame() {
@@ -306,7 +371,7 @@ function checkGameName($GameNameToCheck, $anyIndicator) {
 		// printf ("false = get last inserted %s", $GameNameToCheck);
 		$sqlCheckGame = "select game_id from $TABGAME where GAME_TITLE = ? ORDER BY game_id desc";
 	}
-	// printf("will check with %s to Game %s\n", $sqlCheckGame, $GameNameToCheck);
+	debug_log ("will check with $sqlCheckGame to Game $GameNameToCheck");
 	// create a prepared statement
 	$stmt = $obj_mySqliConn->prepare($sqlCheckGame) or die ("died prepare");
 	// bind
@@ -322,25 +387,11 @@ function checkGameName($GameNameToCheck, $anyIndicator) {
 	$stmt->fetch();
 
 	debug_log($GameNameToCheck . " has the ID " . $res_game_id);
-	
+
 //	$row=$stmt->get_result();
 //	$row->fetch_row(MYSQLI_ASSOC) or die ("something happened in checkGameName while ". $GameNameToCheck . " but I tried " . $row["game_id"]);
 //	printf("accessed game_id: %s\n\n", $row["game_id"]);
 	return $res_game_id;
-	
-//            mysqli_stmt_bind_param($stmt, "s", $param_username);
-// Set parameters
-//      $param_username = $username;
-// Attempt to execute the prepared statement
-//      if(mysqli_stmt_execute($stmt)){
-// Store result
-//        mysqli_stmt_store_result($stmt);
-// Check if username exists, if yes then verify password
-//        if(mysqli_stmt_num_rows($stmt) == 1){                    
-// Bind result variables
-//           mysqli_stmt_bind_result($stmt, $id, $username, $hashed_password);
-//           if(mysqli_stmt_fetch($stmt)){
-	
 	
 }
 
@@ -362,32 +413,137 @@ function createGameFromSession ($GameName) {
 	return $last_id;
 }
 
+function insertUpdateGame() {
+	// Include config file
+	include ('incl/config.php');
+	mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+	$sqlInsUp = " ";
+	if ( isset($_REQUEST['gameId']) && $_REQUEST['gameId'] > 0 ) {
+		$param_gameId=$_REQUEST['gameId'] ;
+		debug_log("insertUpdateGame isset" . $param_gameId);
+	} else {
+		debug_log("insertUpdateGame isset else");
+		$param_gameId = 0;
+		$param_gameName=$_REQUEST['GameTitle'] ;
+		debug_log("insertUpdateGame: game " . $param_gameName . " not found to ID: " . $param_gameId . ", will create");
+		$param_gameId = createGameFromSession($param_gameName);
+		debug_log("insertUpdateGame: game-ID after createGameFromSession " . $param_gameId . ", will use");
+	}
+	if ( is_numeric($param_gameId) && $param_gameId > 0 ) {
+	// gameId given -> lets use it
+		$whatToDo = "update";
+		debug_log("insertUpdateGame: game-ID given " . $param_gameId . ", will use");
+		$sqlInsUp .= "update $TABGAME ";
+		$sqlInsUp .= "set GAME_TITLE = ? ";				// 1 = GT
+		$sqlInsUp .= ",GAME_PLAYER_MIN = ? ";			// 2 = GPL
+		$sqlInsUp .= ",GAME_PLAYER_MAX = ? ";			// 3 = GPH
+		$sqlInsUp .= ",GAME_AGE_MIN = ? ";				// 4 = GAL
+		$sqlInsUp .= ",GAME_AGE_MAX = ? ";				// 5 = GAH
+		$sqlInsUp .= ",GAME_ESTIM_TIME_MIN = ? ";		// 6 = GTL
+		$sqlInsUp .= ",GAME_ESTIM_TIME_MAX = ? ";		// 7 = GTH
+		$sqlInsUp .= ",GAME_EXTENSION_FROM_GAME = ? ";		// 8 = GEG
+		$sqlInsUp .= ",GAME_EXTENSION_FROM_GAME_ID = ? ";	// 9 = GEGI
+		$sqlInsUp .= " where GAME_ID = ? ";				// 10 = GI
+	} else {
+		$whatToDo = "insert";
+		debug_log("#todo: polibahn check. insertUpdateGame: game-ID not given will create. should not happen anymore!!!!");
+		//----------------
+		$sqlInsUp  = "";
+		// $sqlInsUp .= "INSERT INTO $TABPLAYED";
+		//              1        2              3                        4
+		// $sqlInsUp .= "(GAME_ID, PLAY_GROUP_ID, PLAY_GROUP_PLAYERS_TEXT, PLAY_TIMESTAMP, ";
+		//             5          6           7                8
+		// $sqlInsUp .= "PLAY_TIME, PLAY_STARS, PLAY_DIFFICULTY, PLAY_WINNERS";
+		// $sqlInsUp .= ")";
+		//                    1 2 3 4 5 6 7 8
+		// $sqlInsUp .= "value (?,?,?,?,?,?,?,?)";
+	}	// end of "what to do"
+	debug_log("in insertUpdateGame (" . $whatToDo ."), working with:" . $sqlInsUp);
+
+	// create a prepared statement
+	$stmt = $obj_mySqliConn->prepare($sqlInsUp);
+
+	//----------------
+   // Set parameters
+   // auto set:
+	//		GAME_ID		already set
+	// set already:
+	//
+	// pending feature:
+	//		GAME_TITLE                  
+	//		GAME_PLAYER_MIN             
+	//		GAME_PLAYER_MAX             
+	//		GAME_AGE_MIN                
+	//		GAME_AGE_MAX                
+	//		GAME_ESTIM_TIME_MIN         
+	//		GAME_ESTIM_TIME_MAX         
+	//		GAME_EXTENSION_FROM_GAME    
+	//		GAME_EXTENSION_FROM_GAME_ID 
+	//
+	// set values
+	// 1 = GT  = GAME_TITLE
+	$param_gameName = $_REQUEST['GameTitle'];
+	// 2 = GPL = GAME_PLAYER_MIN
+	$param_GamePlayMin = $_REQUEST['GamePlayMin'];
+	// 3 = GPH = GAME_PLAYER_MAX
+	$param_GamePlayMax = $_REQUEST['GamePlayMax'];
+	// 4 = GAL = GAME_AGE_MIN
+	$param_GameAgeMin = $_REQUEST['GameAgeMin'];
+	// 5 = GAH = GAME_AGE_MAX
+	$param_GameAgeMax = $_REQUEST['GameAgeMax'];
+	// 6 = GTL = GAME_ESTIM_TIME_MIN
+	$param_GameTimeMin = $_REQUEST['GameTimeMin'];
+	// 7 = GTH = GAME_ESTIM_TIME_MAX
+	$param_GameTimeMax = $_REQUEST['GameTimeMax'];
+	// 8 = GEG = GAME_EXTENSION_FROM_GAME
+	$param_GameExtendFromGameName = $_REQUEST['GameExtendFromGameName'];
+	// 9 = GEGI = GAME_EXTENSION_FROM_GAME_ID
+	$param_GameExtendFromGameId = $_REQUEST['GameExtendFromGameId'];
+	// 10 = GI  = GAME_ID
+	$param_GamePlayMin = $_REQUEST['GamePlayMin'];
+
+	//----------------
+	// bind
+	//                 1234567890    1               2                    3                   4                  5
+	$stmt->bind_param("siiiiiisii", $param_gameName, $param_GamePlayMin, $param_GamePlayMax, $param_GameAgeMin, $param_GameAgeMax
+											// 6                   7                   8                              9
+	                              , $param_GameTimeMin, $param_GameTimeMax, $param_GameExtendFromGameName, $param_GameExtendFromGameId
+	                              , $param_gameId );
+
+	/* execute query */
+	// use exec() because no results are returned
+	$stmt->execute();
+
+	mysqli_stmt_close($stmt);
+
+}
+
 function insertPlayed() {
 	// Include config file
 	include ('incl/config.php');
 	mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-	$param_gameid=isset($_REQUEST['PlayGameID']);
-	if ( is_numeric($param_gameid) ) {
-	// gameID given -> lets use it	
-		debug_log("game-ID given " . $param_gameid . ", will use");
+	$param_gameId=isset($_REQUEST['PlaygameId']);
+	if ( is_numeric($param_gameId) ) {
+	// gameId given -> lets use it	
+		debug_log("game-ID given " . $param_gameId . ", will use");
 	} else {
-		// gameId empty -> check name
+		// gameId empty -> check by name
 		// set parameters
-		$param_gamename  = $_REQUEST['PlayGameTitle'];
-		$found_gameID = checkGameName($param_gamename, true);
-		if ( $found_gameID > 0 ) {
-			// gameID found -> lets use it
-			$param_gameid = $found_gameID;
-			debug_log("game-ID found " . $param_gameid . ", will use<br />");
+		$param_gameName  = $_REQUEST['PlayGameTitle'];
+		$found_gameId = checkGameName($param_gameName, true);
+		if ( $found_gameId > 0 ) {
+			// gameId found -> lets use it
+			$param_gameId = $found_gameId;
+			debug_log("game-ID found " . $param_gameId . ", will use<br />");
 		} else {
 			// game not found -> create new game
-			debug_log("game " . $param_gamename . " not found " . $param_gameid . ", will create");
-			$param_gameid = createGameFromSession($param_gamename);
-			debug_log("game-ID after createfromSession " . $param_gameid . ", will use");
-
+			debug_log("game " . $param_gameName . " not found " . $param_gameId . ", will create");
+			$param_gameId = createGameFromSession($param_gameName);
+			debug_log("game-ID after createfromSession " . $param_gameId . ", will use");
 		}
-	}	// end of gameID-check
+	}	// end of gameId-check
 
 	//----------------
 	$sqlInsert  = "INSERT INTO $TABPLAYED";
@@ -406,7 +562,7 @@ function insertPlayed() {
    // auto set:
    //   PLAYED_ID
 	// set already:
-	//   $param_gameid		GAME_ID
+	//   $param_gameId		GAME_ID
 	//
 	// pending feature:
 	//		PLAY_PLACE              
@@ -434,7 +590,7 @@ function insertPlayed() {
 	//----------------
 	// bind
 	//                 12345678    1              2                     3                               4                 5                   6                  7                 8
-	$stmt->bind_param("iisssiis", $param_gameid, $param_play_group_id, $param_play_group_players_text, $param_play_date, $param_play_length, $param_play_stars, $param_play_diff, $param_play_win);
+	$stmt->bind_param("iisssiis", $param_gameId, $param_play_group_id, $param_play_group_players_text, $param_play_date, $param_play_length, $param_play_stars, $param_play_diff, $param_play_win);
 
 	/* execute query */
 	// use exec() because no results are returned
@@ -444,6 +600,7 @@ function insertPlayed() {
 	mysqli_stmt_close($stmt);
 
 }
+
 
 function showGameOverview() {
 	// Include config file
@@ -531,7 +688,7 @@ function showGameOverview() {
 		printf($formPattern, "showInsertGame", $row["GAME_ID"], getTextToLanguageKey("edit game", $_SESSION['username']));		
 
 		printf ("</tr>");
-
+	
 	}
 
 	mysqli_stmt_free_result($stmt);

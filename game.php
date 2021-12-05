@@ -26,12 +26,25 @@ if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
   	require_once('incl/functions.php');
 	checkDBConn();
 
-
-if ( isset($_REQUEST["action"]) && $_REQUEST["action"] == "insertPlayedGame" ){
-    	require_once('incl/functions.php');
-		insertPlayed();
-	// and now set "show Content"
-		$_REQUEST["action"] = "showContent";
+if ( isset($_REQUEST["action"]) ) {
+	
+	switch( $_REQUEST["action"] ) {
+		case "insertPlayedGame": {
+	    	require_once('incl/functions.php');
+			insertPlayed();
+			// and now set "show Content"
+			$_REQUEST["action"] = "showContent";
+			break;
+		}
+		case "insertUpdateGame": {
+	    	require_once('incl/functions.php');
+	    	debug_log("doing insertUpdateGame");
+			insertUpdateGame();
+			// afterwards: show game overview
+			$_REQUEST["action"] = "showGameOverview";
+			break;
+		}
+	}
 }
 
 if ( ! isset($_REQUEST["action"]) ){
@@ -69,6 +82,7 @@ if ( ! isset($_REQUEST["action"]) ){
 
     <?php
     	require_once('incl/functions.php');
+    	debug_log("in game.php with function: " . $_REQUEST["action"]);
     	switch ($_REQUEST["action"]) {
 		case 'showInsertGame': {
 					showInsertGame();
